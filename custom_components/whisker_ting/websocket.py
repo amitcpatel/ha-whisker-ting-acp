@@ -75,27 +75,60 @@ class WhiskerWebSocket:
         """Return True if connected."""
         return self._connected
 
+    @staticmethod
+    def _frame(payload: bytes) -> bytes:
+        """Prepend the SignalR MessagePack length prefix (LEB128 varint).
+
+        The SignalR Hub MessagePack protocol frames every message after the
+        handshake as: <varint length><msgpack body>. The body itself is a
+        *bare array* (NOT a map keyed by 1). The upstream integration omitted
+        the length prefix and wrapped the body in a {1: [...]} map, which the
+        server cannot parse — so the stream subscription never starts and the
+        connection goes stale in ~30s. This restores spec-correct framing.
+        """
+        length = len(payload)
+        prefix = bytearray()
+        # LEB128 unsigned varint
+        while True:
+            byte = length & 0x7F
+            length >>= 7
+            if length:
+                prefix.append(byte | 0x80)
+            else:
+                prefix.append(byte)
+                break
+        return bytes(prefix) + payload
+
     def _encode_invocation(self, method: str, args: list) -> bytes:
-        """Encode a SignalR invocation message."""
+        """Encode a SignalR invocation message (spec-correct framing).
+
+        Body is a bare array:
+        [type, headers, invocationId, target, arguments, streamIds]
+        Type 1 = INVOCATION. Then length-prefixed via _frame().
+        """
         self._message_id += 1
-        # SignalR MessagePack invocation format:
-        # {1: [type, headers, invocationId, target, arguments]}
-        # Type 1 = INVOCATION (not streaming)
-        message = {
-            1: [
+        body = msgpack.packb(
+            [
                 MSG_TYPE_INVOCATION,
                 {},  # headers
                 str(self._message_id),  # invocationId
                 method,
                 args,
-            ]
-        }
-        return msgpack.packb(message, use_bin_type=True)
+                [],  # streamIds
+            ],
+            use_bin_type=True,
+        )
+        return self._frame(body)
 
     def _encode_ping(self) -> bytes:
-        """Encode a SignalR ping message."""
-        # Ping is just {1: [6]}
-        return msgpack.packb({1: [MSG_TYPE_PING]}, use_bin_type=True)
+        """Encode a SignalR ping message.
+
+        Ping body is the bare array [6], length-prefixed → \\x02\\x91\\x06,
+        which is exactly the frame the receive loop already recognises as a
+        valid ping response.
+        """
+        body = msgpack.packb([MSG_TYPE_PING], use_bin_type=True)
+        return self._frame(body)
 
     def _decode_voltage_data(self, data: bytes) -> VoltageData | None:
         """Decode voltage data from MessagePack message."""
