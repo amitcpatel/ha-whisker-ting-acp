@@ -1,13 +1,18 @@
 {
   "domain": "whisker_ting",
   "name": "Whisker Ting (ACP fork)",
-  "codeowners": ["@amitcpatel", "@simplytoast1"],
+  "codeowners": [
+    "@amitcpatel",
+    "@simplytoast1"
+  ],
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/amitcpatel/ha-whisker-ting-acp",
   "integration_type": "service",
   "iot_class": "cloud_push",
   "issue_tracker": "https://github.com/amitcpatel/ha-whisker-ting-acp/issues",
-  "requirements": ["aiohttp>=3.8.0", "msgpack>=1.0.0"],
+  "requirements": [
+    "msgpack==1.2.3"
+  ],
   "version": "1.0.2-acp"
 }
