@@ -64,9 +64,55 @@ Home Assistant integration for [Whisker Labs Ting](https://www.tingfire.com/) el
 
 ## Requirements
 
-- Home Assistant 2024.1.0 or newer
+- Home Assistant 2024.1.0 or newer (minimum declared in `hacs.json`; tested on 2026.10.2, see below)
 - Whisker Labs Ting device
 - Whisker Labs account
+
+## Dependencies and security audit
+
+The integration has one runtime requirement of its own and uses one package
+that Home Assistant core already ships:
+
+| Package | Who provides it | Version |
+|---------|-----------------|---------|
+| `msgpack` | this integration (`manifest.json` `requirements`) | `==1.2.3`, exact pin |
+| `aiohttp` | Home Assistant core | whatever your HA release pins (3.14.5 in 2026.10.2) |
+
+Rules this repo follows:
+
+- `aiohttp` is **not** listed in `manifest.json`. Home Assistant pins it in
+  `homeassistant/package_constraints.txt`; re-declaring it can only conflict
+  with core. The integration uses HA's shared session
+  (`async_get_clientsession`).
+- `msgpack` is an exact pin. Home Assistant core does not pin `msgpack`, so
+  this does not fight HA's constraints. 1.2.3 is above the fix for
+  GHSA-6v7p-g79w-8964 / CVE-2026-57585 (fixed in 1.2.1) and ships wheels for
+  Python 3.14 on manylinux and musllinux (HA OS / container).
+- Tested platform: Home Assistant 2026.10.2, Python 3.14, via
+  `pytest-homeassistant-custom-component==0.13.373` (see `requirements_test.txt`).
+
+Reproducible audit input:
+
+- `requirements/ha-2026.10.2-constraints.txt` is a verbatim copy of HA
+  2026.10.2's `package_constraints.txt`.
+- `requirements/audit-closure.txt` is the integration's resolved runtime
+  closure (direct + transitive) under those constraints.
+- `script/audit_deps.sh` re-resolves the closure with `uv`, fails if it drifted
+  from the committed file, then runs `pip-audit` on it. Use `--update` after a
+  deliberate bump.
+
+When moving to a new HA release: copy that release's `package_constraints.txt`
+into `requirements/`, bump `HA_VERSION` in `script/audit_deps.sh`, the
+harness in `requirements_test.txt` and `TESTED_HA_VERSION` in
+`tests/test_dependencies.py`, then run `script/audit_deps.sh --update` and the
+tests.
+
+```bash
+uv venv -p 3.14 .venv
+uv pip install -p .venv/bin/python -r requirements_test.txt
+.venv/bin/python -m pytest
+script/audit_deps.sh
+```
 
 ## Troubleshooting
 

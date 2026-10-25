@@ -1,0 +1,4 @@
+# Test harness pinned to the Home Assistant release this integration is tested on.
+# pytest-homeassistant-custom-component 0.13.373 pins homeassistant==2026.10.2 (Python >=3.14).
+pytest-homeassistant-custom-component==0.13.373
+msgpack==1.2.3
